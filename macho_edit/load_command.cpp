@@ -148,6 +148,13 @@ std::string LoadCommand::description() const {
 
 			break;
 		}
+        case LC_ID_DYLIB: {
+            auto *c = (dylib_command *)raw_lc;
+            
+            o << ": " << get_lc_str(c->dylib.name);
+            
+            break;
+        }
 		case LC_RPATH: {
 			auto *c = (rpath_command *)raw_lc;
 

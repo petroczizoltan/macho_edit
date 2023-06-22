@@ -372,6 +372,14 @@ void MachO::insert_load_command(uint32_t arch_index, load_command *raw_lc) {
 	write_mach_header(arch);
 }
 
+void MachO::change_file_type(uint32_t arch_index, uint32_t file_type) {
+    MachOArch &arch = archs[arch_index];
+
+    arch.mach_header.filetype = file_type;
+
+    write_mach_header(arch);
+}
+
 bool MachO::remove_codesignature(uint32_t arch_index) {
 	MachOArch &arch = archs[arch_index];
 	uint32_t magic = arch.mach_header.magic;

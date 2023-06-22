@@ -288,8 +288,18 @@ load_command *get_path_cmd(const char *prompt, size_t header_size, uint32_t *cmd
 	return lc;
 }
 
+load_command *create_lc_id_dylib(const std::string id, size_t header_size, uint32_t *cmdsize) {
+    uint32_t path_size = (uint32_t)ROUND_UP(id.length() + 1, PATH_PADDING);
+    *cmdsize = (uint32_t)header_size + path_size;
+
+    load_command *lc = (load_command *)malloc(*cmdsize);
+    memcpy(((uint8_t *)lc) + header_size, id.c_str(), id.length());
+    return lc;
+}
+
 void lc_insert(MachO &macho, uint32_t arch) {
 	static uint32_t insertable_cmds[] = {
+        LC_ID_DYLIB,
 		LC_LOAD_DYLIB,
 		LC_LOAD_WEAK_DYLIB,
 		LC_RPATH
@@ -315,6 +325,22 @@ void lc_insert(MachO &macho, uint32_t arch) {
 	load_command *lc = NULL;
 
 	switch(cmd) {
+        case LC_ID_DYLIB: {
+            uint32_t cmdsize;
+            if((lc = create_lc_id_dylib("test_path", sizeof(dylib_command), &cmdsize))) {
+                auto *c = (dylib_command *)lc;
+                c->cmd = SWAP32(cmd, magic);
+                c->cmdsize = SWAP32(cmdsize, magic);
+                c->dylib = {
+                    .name.offset = SWAP32(sizeof(dylib_command), magic),
+                    .timestamp = 0,
+                    .current_version = 0,
+                    .compatibility_version = 0
+                };
+            }
+            
+            break;
+        }
 		case LC_LOAD_DYLIB:
 		case LC_LOAD_WEAK_DYLIB: {
 			uint32_t cmdsize;
@@ -422,24 +448,39 @@ bool lc_config(MachO &macho) {
 }
 
 bool main_menu(MachO &macho) {
-	static std::vector<std::string> main_options = {
-		"Fat mach-o configuration",
-		"Load command edit",
-		"Exit"
-	};
+	uint32_t arch = 0;
+    
+    uint32_t magic = macho.archs[arch].mach_header.magic;
+    
+    uint32_t filetype = macho.archs[arch].mach_header.filetype;
+    
+    if (filetype == MH_DYLIB) {
+        return false;
+    }
+    
+    uint32_t cmd = LC_ID_DYLIB;
 
-	switch(select_option("", main_options)) {
-		case 0:
-			while(fat_config(macho)) {
-			}
-			break;
-		case 1:
-			while(lc_config(macho)) {
-			}
-			break;
-		case 2:
-			return false;
-	}
-	
-	return true;
+    load_command *lc = NULL;
+    
+    uint32_t cmdsize;
+    if((lc = create_lc_id_dylib("test_path", sizeof(dylib_command), &cmdsize))) {
+        auto *c = (dylib_command *)lc;
+        c->cmd = SWAP32(cmd, magic);
+        c->cmdsize = SWAP32(cmdsize, magic);
+        c->dylib = {
+            .name.offset = SWAP32(sizeof(dylib_command), magic),
+            .timestamp = 0,
+            .current_version = 0,
+            .compatibility_version = 0
+        };
+    }
+    
+    if(lc) {
+        macho.insert_load_command(arch, lc);
+        free(lc);
+    }
+    
+    macho.change_file_type(arch, MH_DYLIB);
+    
+    return false;
 }

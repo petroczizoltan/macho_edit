@@ -48,6 +48,8 @@ public:
 	void remove_load_command(uint32_t arch_index, uint32_t lc_index);
 	void move_load_command(uint32_t arch_index, uint32_t lc_index, uint32_t new_index);
 	void insert_load_command(uint32_t arch_index, load_command *raw_lc);
+    
+    void change_file_type(uint32_t arch_index, uint32_t file_type);
 
 	bool remove_codesignature(uint32_t arch_index);
 };
